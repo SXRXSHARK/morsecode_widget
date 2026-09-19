@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Morse Code Widget</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-2xl transform transition-transform duration-300 hover:scale-[1.01]">
+        
+        <h1 class="text-3xl md:text-4xl font-bold text-center mb-2 text-yellow-400 drop-shadow-md">Morse Code</h1>
+        <h2 class="text-xl font-medium text-center mb-8 text-gray-400">Encoder & Decoder</h2>
+        
+        <div class="space-y-6">
+            
+            <div>
+                <label for="input" class="block text-sm font-semibold mb-2 text-gray-400">Enter your text or Morse code:</label>
+                <textarea id="input" rows="6" class="w-full p-3 rounded-xl bg-gray-700 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-all duration-200 resize-none"></textarea>
+            </div>
+            
+            <div class="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4">
+                
+                <select id="operation" class="w-full md:w-auto p-3 rounded-xl bg-gray-700 text-gray-100 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-all duration-200 cursor-pointer">
+                    <option value="enc">Encode</option>
+                    <option value="dec">Decode</option>
+                </select>
+                
+                <button id="submitBtn" class="w-full md:w-auto p-3 rounded-xl font-semibold bg-yellow-500 text-gray-900 shadow-md hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200 transform hover:-translate-y-1 hover:scale-105">
+                    Convert
+                </button>
+            </div>
+
+            <div id="messageBox" class="bg-red-700 text-white p-3 rounded-xl text-center hidden transition-all duration-300">
+                </div>
+
+            <div>
+                <label for="output" class="block text-sm font-semibold mb-2 text-gray-400">Result:</label>
+                <textarea id="output" rows="6" readonly class="w-full p-3 rounded-xl bg-gray-700 text-gray-100 placeholder-gray-500 cursor-not-allowed focus:outline-none transition-all duration-200 resize-none"></textarea>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Use a single object for the Morse code dictionary to avoid duplication
+        const morseCodeMap = {
+            'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
+            'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
+            'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.',
+            'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-',
+            'Y': '-.--', 'Z': '--..',
+            '0': '-----', '1': '.----', '2': '..---', '3': '...--', '4': '....-',
+            '5': '.....', '6': '-....', '7': '--...', '8': '---..', '9': '----.',
+            '&': '.-...', "'": '.----.', '@': '.--.-.', ')': '-.--.-', '(': '-.--.',
+            ':': '---...', ',': '--..--', '=': '-...-', '!': '-.-.--', '.': '.-.-.-',
+            '-': '-....-', '+': '.-.-.', '"': '.-..-.', '?': '..--..', '/': '-..-.'
+        };
+        
+        // Create a reverse lookup map for decoding and make the values lowercase
+        const reverseMorseCodeMap = Object.fromEntries(
+            Object.entries(morseCodeMap).map(([key, value]) => [value, key.toLowerCase()])
+        );
+
+        // Get DOM elements
+        const inputEl = document.getElementById("input");
+        const outputEl = document.getElementById("output");
+        const operationEl = document.getElementById("operation");
+        const submitBtn = document.getElementById("submitBtn");
+        const messageBoxEl = document.getElementById("messageBox");
+
+        /**
+         * Shows a message to the user in a styled box instead of using an alert.
+         * @param {string} message The message to display.
+         * @param {string} type The type of message ('error' or 'success').
+         */
+        function showMessage(message, type) {
+            messageBoxEl.textContent = message;
+            messageBoxEl.classList.remove('hidden', 'bg-red-700', 'bg-green-700');
+            if (type === 'error') {
+                messageBoxEl.classList.add('bg-red-700');
+            } else {
+                messageBoxEl.classList.add('bg-green-700');
+            }
+            // Hide the message after a few seconds
+            setTimeout(() => {
+                messageBoxEl.classList.add('hidden');
+            }, 5000);
+        }
+
+        /**
+         * Encodes a given text string into Morse code.
+         * Separates characters with a space and words with a '/' separator.
+         * @param {string} text The text to encode.
+         * @returns {string} The encoded Morse code string or an empty string on error.
+         */
+        function encodeText(text) {
+            // Check for Morse code symbols in the input string
+            const containsMorse = /[.-]/.test(text);
+            if (containsMorse) {
+                showMessage("Invalid input: Cannot encode Morse code. Please enter regular text.", 'error');
+                return '';
+            }
+
+            // Check if the input contains any characters that are not in the map
+            const invalidChars = text.toUpperCase().split('').filter(char => char !== ' ' && !morseCodeMap[char]);
+            if (invalidChars.length > 0) {
+                showMessage("Invalid input: Please use only valid characters.", 'error');
+                return '';
+            }
+            
+            // Split the text into words and then into characters to handle spaces correctly
+            return text.toUpperCase().split(' ').map(word => {
+                return word.split('').map(char => morseCodeMap[char]).join(' ');
+            }).join(' / ');
+        }
+
+        /**
+         * Decodes a Morse code string back into text.
+         * Handles single spaces for characters and three spaces or '/' for word separation.
+         * @param {string} morse The Morse code string to decode.
+         * @returns {string} The decoded text string or an empty string on error.
+         */
+        function decodeMorse(morse) {
+            // A more robust check for valid Morse code symbols
+            const invalidSymbols = morse.split(' ').filter(symbol => symbol !== '' && symbol !== '/' && !reverseMorseCodeMap[symbol]);
+            if (invalidSymbols.length > 0) {
+                showMessage("Invalid input: Please use only valid Morse code symbols (., -, /, and spaces).", 'error');
+                return '';
+            }
+
+            // Replace the '/' word separator with a consistent three-space separator
+            const normalizedMorse = morse.replace(/\s*\/\s*/g, '   ').trim();
+            
+            // Split by three spaces (word breaks) and then by single spaces (character breaks)
+            return normalizedMorse.split('   ').map(word => {
+                return word.split(' ').map(symbol => reverseMorseCodeMap[symbol] || '').join('');
+            }).join(' ');
+        }
+
+        /**
+         * Main function to handle the conversion based on the selected operation.
+         */
+        function handleConversion() {
+            const inputValue = inputEl.value.trim();
+            const selectedOperation = operationEl.value;
+            let result = '';
+
+            // Clear previous message
+            messageBoxEl.classList.add('hidden');
+
+            // Handle empty input
+            if (!inputValue) {
+                showMessage("Input field is empty.", 'error');
+                outputEl.value = '';
+                return;
+            }
+
+            if (selectedOperation === "enc") {
+                result = encodeText(inputValue);
+            } else if (selectedOperation === "dec") {
+                result = decodeMorse(inputValue);
+            } else {
+                result = "Invalid operation selected.";
+                showMessage(result, 'error');
+            }
+            
+            // Display the result if no error occurred
+            if (result) {
+                outputEl.value = result;
+            } else {
+                outputEl.value = ''; // Clear output on error
+            }
+        }
+
+        // Add event listener to the submit button
+        submitBtn.addEventListener('click', handleConversion);
+
+        // Also add a listener for the enter key in the input field
+        inputEl.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                handleConversion();
+            }
+        });
+    </script>
+</body>
+</html>
